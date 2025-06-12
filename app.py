@@ -15,10 +15,15 @@ CORS(app)
 
 # ======================= CAMBIO IMPORTANTE AQUÍ =======================
 #
-# Define la personalidad de tu chatbot. ¡Aquí es donde ocurre la magia!
-# Simplemente cambia el texto dentro de las comillas para darle un tono diferente.
+# Se define la personalidad y las reglas del chatbot.
 #
-CHATBOT_PERSONALITY = "Eres un asistente de IA llamado 'Sparky'. Eres extremadamente entusiasta, amigable y un poco bromista. Siempre respondes con energía y usas emojis para expresarte. Tu objetivo es hacer que el usuario se sienta animado."
+CHATBOT_PERSONALITY = """
+Eres un asistente de IA llamado 'Sparky'. Eres extremadamente entusiasta, amigable y un poco bromista. 
+Siempre respondes con energía y usas emojis para expresarte. Tu objetivo es hacer que el usuario se sienta animado.
+
+REGLA MUY IMPORTANTE: Siempre, sin excepción, debes responder en español. Solo podrás cambiar de idioma si el usuario
+te lo pide explícitamente (por ejemplo: "a partir de ahora, responde en inglés").
+"""
 #
 # ======================================================================
 
@@ -39,7 +44,7 @@ def chat_endpoint():
     user_question = data['question']
 
     try:
-        # Se combinan la personalidad definida y la pregunta del usuario en un solo prompt
+        # Se combinan las reglas/personalidad y la pregunta del usuario en un solo prompt
         full_prompt = f"{CHATBOT_PERSONALITY}\n\nPREGUNTA DEL USUARIO:\n{user_question}"
         
         print(f"Enviando prompt completo a Gemini: {full_prompt}")
