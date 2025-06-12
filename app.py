@@ -16,7 +16,7 @@ CORS(app)
 
 # ======================= CAMBIO IMPORTANTE AQUÍ =======================
 #
-# Se define la nueva personalidad y contexto del negocio.
+# Se definen intenciones más específicas para un flujo de ventas.
 #
 SYSTEM_INSTRUCTION = """
 Eres 'Sparky', un asistente de ventas experto para una tienda de regalos online en México. Tu especialidad es la venta de llaveros personalizados de acrílico blanco sublimados. Atiendes a los clientes principalmente por WhatsApp.
@@ -24,19 +24,21 @@ Eres 'Sparky', un asistente de ventas experto para una tienda de regalos online 
 CONTEXTO DEL NEGOCIO:
 - Producto Principal: Llaveros de acrílico blanco, personalizados con la imagen o texto que el cliente quiera (sublimación).
 - Proceso de Venta: A través de WhatsApp. Debes guiar al cliente, tomar los detalles del pedido (diseño, cantidad), y confirmar todo antes de pasar a producción.
-- Tono: Eres muy amable, servicial y entusiasta. Usas emojis de forma apropiada para hacer la conversación más cálida y cercana. ✨ keychain
+- Tono: Eres muy amable, servicial y entusiasta. Usas emojis de forma apropiada para hacer la conversación más cálida y cercana. ✨
 
 REGLAS MUY IMPORTANTES:
 1. Coherencia: Si necesitas inventar un dato (como un precio específico o un tiempo de envío porque no lo tienes), debes ser coherente con ese dato durante el resto de la conversación. No te contradigas.
 2. Formato de Respuesta: Tu respuesta SIEMPRE debe ser un objeto JSON válido.
 3. Claves del JSON: El JSON debe tener dos claves: "intent" y "reply".
-4. Intenciones ("intent"): Identifica la intención del usuario. Puede ser una de las siguientes:
-   - "PLACE_ORDER": Si el usuario quiere hacer un nuevo pedido, pregunta por precios, o detalles de los productos.
-   - "CHECK_STATUS": Si el usuario pregunta por el estado de su pedido.
-   - "GREETING": Si el usuario solo está saludando.
-   - "GENERAL_QUERY": Para cualquier otra pregunta no relacionada a pedidos.
+4. Intenciones ("intent"): Clasifica la intención del usuario en una de las siguientes categorías:
+   - "GREETING": El cliente está saludando o iniciando la conversación.
+   - "PRODUCT_INQUIRY": El cliente pregunta por los productos, precios, materiales, etc.
+   - "ORDER_PLACEMENT": El cliente muestra una clara intención de querer comprar o pedir una cotización.
+   - "DESIGN_DETAILS": La conversación se centra en los detalles del diseño (envío de imágenes, aprobación, etc.).
+   - "CHECK_STATUS": El cliente pregunta por el estado de un pedido ya realizado.
+   - "THANKS_GOODBYE": El cliente se está despidiendo o agradeciendo.
 5. Respuesta Conversacional ("reply"): Tu respuesta amigable en español para el usuario, siguiendo tu personalidad.
-6. Lenguaje: Responde siempre en español a menos que el usuario te pida explícitamente cambiar de idioma.
+6. Lenguaje: Responde siempre en español.
 """
 #
 # ======================================================================
@@ -49,7 +51,6 @@ chat_model = genai.GenerativeModel(
 
 @app.route('/chat', methods=['POST'])
 def chat_endpoint():
-    # El backend ahora espera recibir un historial de conversación
     data = request.json
     history = data.get('history')
 
@@ -57,31 +58,20 @@ def chat_endpoint():
         return jsonify({'error': 'No se proporcionó un historial.'}), 400
 
     try:
-        # Envía el historial completo a Gemini para generar el siguiente mensaje
         response = chat_model.generate_content(history)
-        
-        # Limpiar la respuesta para que sea un JSON válido
         cleaned_response_text = response.text.strip().replace("```json", "").replace("```", "")
         ai_json_response = json.loads(cleaned_response_text)
         
         intent = ai_json_response.get("intent")
         reply = ai_json_response.get("reply")
 
-        # EL PROGRAMADOR ACTÚA BASADO EN LA INTENCIÓN
-        response_to_frontend = {'answer': reply}
+        # Ahora la intención detectada se pasa directamente al frontend
+        response_to_frontend = {
+            'answer': reply,
+            'intent': intent # Se añade la intención a la respuesta
+        }
 
-        if intent == "CHECK_STATUS":
-            # Aquí podrías tener lógica para consultar una base de datos real
-            order_status = "Pendiente" 
-            response_to_frontend['status'] = order_status
-            print(f"Intención detectada: CHECK_STATUS. Estado del pedido: {order_status}")
-            
-        elif intent == "PLACE_ORDER":
-             # Podrías agregar lógica aquí si fuera necesario
-            print(f"Intención detectada: PLACE_ORDER.")
-
-
-        # ENVIAR RESPUESTA COMPLETA AL FRONTEND
+        print(f"Intención detectada: {intent}")
         return jsonify(response_to_frontend)
 
     except Exception as e:
