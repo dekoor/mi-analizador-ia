@@ -6,18 +6,20 @@ from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 from flask_cors import CORS
 import json
-import requests # Importar la librería requests
+import requests # Se usa para hacer peticiones a la API
 
 # --- CONFIGURACIÓN ---
 load_dotenv()
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-ENVIATODO_API_KEY = os.getenv("ENVIATODO_API_KEY") # Cargar la API Key de EnviaTodo
+
+# IMPORTANTE: Ahora usamos esta variable. Asegúrate de que así se llame en Render.
+ENVIA_API_KEY = os.getenv("ENVIA_API_KEY") 
 
 app = Flask(__name__)
 # Permitir CORS para ambos endpoints
 CORS(app, resources={r"/chat": {"origins": "*"}, r"/rate": {"origins": "*"}})
 
-# ======================= INSTRUCCIÓN DEL SISTEMA ACTUALIZADA =======================
+# ======================= INSTRUCCIÓN DEL SISTEMA (SIN CAMBIOS) =======================
 SYSTEM_INSTRUCTION = """
 Eres 'Andrea', una asistente de ventas experta para una tienda de regalos online en México. Tu especialidad es la venta de llaveros personalizados de acrílico blanco sublimados.
 
@@ -81,7 +83,7 @@ def chat_endpoint():
         print(f"Error al procesar la respuesta o la intención: {e}")
         return jsonify({'answer': 'Lo siento, estoy teniendo problemas para entenderte en este momento.'})
 
-# ======================= NUEVO ENDPOINT PARA COTIZAR =======================
+# ======================= ENDPOINT DE COTIZACIÓN ACTUALIZADO PARA ENVIA.COM =======================
 @app.route('/rate', methods=['POST', 'OPTIONS'])
 def rate_endpoint():
     if request.method == 'OPTIONS':
@@ -94,36 +96,54 @@ def rate_endpoint():
     if not all([from_zip, to_zip]):
         return jsonify({'error': 'Faltan los códigos postales.'}), 400
         
-    if not ENVIATODO_API_KEY:
-        return jsonify({'error': 'La API Key de EnviaTodo no está configurada en el servidor.'}), 500
+    if not ENVIA_API_KEY:
+        return jsonify({'error': 'La API Key de envia.com no está configurada en el servidor.'}), 500
 
-    api_url = "https://app.enviatodo.com/api/v1/rate"
+    # URL correcta para la API de envia.com
+    api_url = "https://api.envia.com/ship/rate"
     
-    # Datos del paquete (puedes ajustarlos o pedirlos al usuario)
+    # Payload/estructura de datos correcta para envia.com
     payload = {
-        "from_zip": from_zip,
-        "to_zip": to_zip,
-        "weight": "1", # en kg
-        "length": "10", # en cm
-        "width": "10", # en cm
-        "height": "5" # en cm
+        "origin": {
+            "address": {
+                "postalCode": from_zip
+            }
+        },
+        "destination": {
+            "address": {
+                "postalCode": to_zip
+            }
+        },
+        "packages": [
+            {
+                "weight": 1,
+                "dimensions": {
+                    "length": 10,
+                    "width": 10,
+                    "height": 5
+                }
+            }
+        ]
     }
 
     headers = {
-        "Authorization": f"Bearer {ENVIATODO_API_KEY}",
+        "Authorization": f"Bearer {ENVIA_API_KEY}",
         "Content-Type": "application/json"
     }
 
     try:
         response = requests.post(api_url, headers=headers, json=payload)
-        response.raise_for_status() # Lanza un error si la petición falla
+        response.raise_for_status() 
         rates_data = response.json()
+        
+        # El frontend espera que los datos estén en una clave "data", así que mantenemos ese formato.
+        # La API de envia.com ya devuelve una clave "data", por lo que lo pasamos directamente.
         return jsonify(rates_data)
 
     except requests.exceptions.HTTPError as err:
         print(f"Error de HTTP: {err}")
-        print(f"Respuesta del servidor: {response.text}")
-        return jsonify({'error': 'Error al comunicarse con la API de EnviaTodo.', 'details': response.text}), response.status_code
+        print(f"Respuesta del servidor de envia.com: {response.text}")
+        return jsonify({'error': 'Error al comunicarse con la API de envia.com.', 'details': response.text}), response.status_code
     except Exception as e:
         print(f"Error general en la cotización: {e}")
         return jsonify({'error': 'Ocurrió un error inesperado al cotizar.'}), 500
